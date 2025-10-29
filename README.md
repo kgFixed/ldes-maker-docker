@@ -1,2 +1,17 @@
-# ldes-maker-docker
-dockerised run for making ldes feed for ror-id
+To build the docker image:
+
+```bash
+docker build -t ror-records-ldes-builder .
+```
+
+To run:
+
+```bash
+docker run --rm -v "$(pwd)/your_input_folder:/workspace" ror-records-ldes-builder
+```
+
+for windows users
+```bash
+docker run --rm -v /$(pwd)/your_input_folder:/workspace ror-records-ldes-builder
+```
+
