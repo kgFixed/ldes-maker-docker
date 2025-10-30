@@ -15,6 +15,8 @@ RUN sed -i 's/\r$//' /src/entrypoint.py
 RUN mkdir -p /workspace
 VOLUME /workspace
 
+VOLUME /templates
+
 # Run a simple ls -al command to list files and directories
 RUN ls -al /
 

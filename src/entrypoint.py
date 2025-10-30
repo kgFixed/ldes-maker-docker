@@ -2,6 +2,9 @@ import os
 import sys
 import logging
 import re
+from sema import subyt
+from rdflib import Graph
+import pyshacl
 
 
 def main():
@@ -11,7 +14,18 @@ def main():
     )
 
     # Get the mounted volume path from an argument or environment variable
-    volume_path = os.getenv("WORKSPACE", "/workspace")
+    volume_path = os.getenv("workspace", "/workspace")
+
+    templates_path = os.getenv(
+        "templates", os.path.join(os.path.dirname(__file__), "templates")
+    )
+
+    # Validate the template path
+    if not os.path.exists(templates_path):
+        logging.error(
+            f"The specified templates path '{templates_path}' does not exist or is not accessible."
+        )
+        sys.exit(1)
 
     if not volume_path:
         logging.error(
@@ -37,11 +51,43 @@ def main():
         ]
 
         for folder in folders:
+            non_conform_files = []
             if semver_pattern.match(folder):
                 folder_path = os.path.join(volume_path, folder)
                 ttl_files = [f for f in os.listdir(folder_path) if f.endswith(".ttl")]
                 logging.info(
                     f"Semver folder: {folder}, .ttl files count: {len(ttl_files)}"
+                )
+
+                logging.info(
+                    f"Starting SHACL validation for TTL files in folder: {folder}"
+                )
+                for ttl_file in ttl_files:
+                    g = Graph()
+                    ttl_file_path = os.path.join(folder_path, ttl_file)
+                    g.parse(ttl_file_path, format="turtle")
+
+                    shacl_file_path = os.path.join(templates_path, "shapes.ttl")
+                    conforms, results_graph, results_text = pyshacl.validate(
+                        g,
+                        shacl_graph=shacl_file_path,
+                        ont_graph=None,
+                        inference="rdfs",
+                        abort_on_first=False,
+                        meta_shacl=False,
+                        advanced=True,
+                        debug=False,
+                    )
+
+                    if not conforms:
+                        non_conform_files.append(ttl_file)
+                        # Log validation errors line by line
+                        for line in results_text.splitlines():
+                            logging.warning(line)
+                        continue
+            for non_conform_file in non_conform_files:
+                logging.error(
+                    f"File '{non_conform_file}' in folder '{folder}' did not conform to SHACL shapes."
                 )
     except Exception as e:
         logging.error(f"An error occurred while processing the volume: {e}")
